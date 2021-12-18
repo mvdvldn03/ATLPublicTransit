@@ -81,6 +81,7 @@ full_data %>%
   geom_sf(aes(fill = Time/Distance)) +
   scale_fill_gradient(low="white", high="red") 
 ```
+
 Assumption: All groups are affected equally by the pandemic and MARTA's reduction of services
 Assumption: Same useage rates, access != useage
 
