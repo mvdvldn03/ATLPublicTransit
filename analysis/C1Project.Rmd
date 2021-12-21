@@ -4,17 +4,32 @@ author: "Max Vandervelden"
 date: "12/13/2021"
 output: html_document
 ---
+```{r}
+library(sf)
+library(tidyverse)
+```
 
-I wanted to do a project on my home city of Atlanta and its lack of public transportation. Traffic is a notorious problem in the city, and many blame the overeliance on cars for their excessive commutes. The main public operator which connects the city is MARTA (Metropolitan Atlanta Rapid Transit Authority), which operates a bus and a transit system. I took MARTA almost every single day to and from school since middle school, so I have good understanding of how the system works. 
-One big issue with MARTA and something many have criticized it for is its racially-motivated coverage throughout the city:
 
-  https://kinder.rice.edu/2017/02/08/new-study-examines-how-historic-racism-shaped-atlantas-transportation-network
+  There are many cities known for their traffic, fewer for their quality of public transportation. Compared to other global cities, Americans lag behind in both the coverage and frequency of public transit [1]. In my home city of Atlanta, traffic is a notorious problem, and many blame the over reliance on cars for their excessive commutes. 
+  The main public operator in the city is MARTA, or the Metropolitan Atlanta Rapid Transit Authority, which operates a bus and a transit system. One historical issue with MARTA is racially-motivated coverage throughout the city. As one of the most racially income unequal cities in the country, many see Atlanta's underlying divides represented in its public transit or lack thereof [2]. Ever since its founding in 1965, the underfunded system has been seen as component of a two tiered system, designed to serve people of color and low income individuals -- highways and driving acting as the main method of commuting and general transportation for richer, white families in the suburbs. In fact, with the exception of Fulton and Dekalb, all counties in metropolitan Atlanta have hotly debated whether to allow MARTA expansion because of this ingrained belief. Especially in richer suburbs, namely Cobb, Clayton, and Gwinett, MARTA has had significant struggles trying to expand due to pushback from white residents who see the operator as one which will bring in low-income, people of color [3, 4].
+  However, is this stereotype of MARTA is actually true? Does MARTA provide more access and shorter commutes to lower-income and African-American and Hispanic communities? With such aggressive and continuous pushback lasting decades, has MARTA become a service than can only serve certain groups? 
+  Let's divide Atlanta into its Neighborhood Statistical Areas (NSA), each roughly a square mile:
+  
+```{r}
+setwd("~/Downloads/C1Project/analysis")
+shp = read_sf(dsn = "ATL_NSAs", layer = "City_of_Atlanta_Neighborhood_Statistical_Areas") %>%
+  st_transform(crs=4326) %>%
+  select(OBJECTID, STATISTICA, NEIGHBORHO, pop, white, black, asian, other, hispanic, geometry) %>%
+  rename(ID = OBJECTID, GEOID = STATISTICA, neighborhoods = NEIGHBORHO)
 
-MARTA has had significant struggles trying to expand into richer suburbs, namely Cobb, Clayton, and Gwinett, due to pushback from residents who see the operator as one which will bring in low-income, African Americans.
+shp
 
-https://www.atlantamagazine.com/great-reads/marta-tsplost-transportation/
-
-I wanted to research whether this stereotype of MARTA is actually true and whether this continues pushback has succeeded in its goal. Does MARTA serve, i.e. provide more access/shorter commutes to, lower income and certain race communities? Atlanta is also one of the top racially income unequal cities in the country. (https://www.atlantawealthbuilding.org/racial-wealth-gap). Specifically, I want to look at Atlanta's Neighborhood Statistical Areas (NSA) defined here:
+shp %>%
+  ggplot() + 
+  geom_sf(fill = ifelse(shp$ID == 12, 'red', 'white')) + 
+  geom_sf_label(data=subset(shp, shp$ID == 12), aes(label = 'Downtown', family = "AvantGarde", fontface = "bold"), size = 3)
+```
+  
 
   https://opendata.atlantaregional.com/datasets/d6298dee8938464294d3f49d473bcf15/explore?showTable=true
   https://fultoncountyopendata-fulcogis.opendata.arcgis.com/datasets/GARC::income-by-neighborhood-statistical-areas-2017/explore?showTable=true 
@@ -22,33 +37,28 @@ I wanted to research whether this stereotype of MARTA is actually true and wheth
 and their corresponding racial and income data. Then, I want to use Google Maps and its public transit feature to see how long commutes from each area are to get into downtown ATL and add the data on a corresponding tibble.
 
 ```{r}
-library(sf)
-library(tidyverse)
-```
-
-```{r}
-shp = read_sf(dsn = "~/Downloads/ATL_NSAs/", layer = "City_of_Atlanta_Neighborhood_Statistical_Areas") %>%
+setwd("~/Downloads/C1Project/analysis")
+shp = read_sf(dsn = "ATL_NSAs", layer = "City_of_Atlanta_Neighborhood_Statistical_Areas") %>%
   st_transform(crs=4326) %>%
   select(OBJECTID, STATISTICA, NEIGHBORHO, pop, white, black, asian, other, hispanic, geometry) %>%
   rename(ID = OBJECTID, GEOID = STATISTICA, neighborhoods = NEIGHBORHO)
 
-times <- read_csv("~/Downloads/times.csv")
-incomes <- read_csv("~/Downloads/IncomeNSA.csv") %>%
+times <- read_csv("times.csv")
+incomes <- read_csv("IncomeNSA.csv") %>%
   select(GEOID, aMeanHHIncome_e) %>%
   rename(Mean_Income = aMeanHHIncome_e)
-distances <- read_csv("~/Downloads/distance.csv")
+distances <- read_csv("distance.csv")
+arrivals <- read_csv("arrivals.csv")
 
 full_data = shp %>%
   left_join(y = times, by=c("ID"="ID")) %>%
   left_join(y = distances, by=c("ID"="ID")) %>%
-  left_join(y = incomes, by=c("GEOID"="GEOID")) 
-
-ggplot() +
-  geom_sf(data = full_data) +
-  geom_sf(data = full_data[12,], fill = 'red')
+  left_join(y = arrivals, by=c("ID"="ID")) %>%
+  left_join(y = incomes, by=c("GEOID"="GEOID"))  
 
 full_data
 ```
+
 ```{r}
 full_data %>% 
   ggplot() +
@@ -65,21 +75,17 @@ full_data %>%
   geom_sf(aes(fill = Mean_Income)) +
   scale_fill_gradient(low="white", high="red")
 
-full_data %>%
-  ggplot() + 
-  geom_sf(aes(fill = Distance)) + 
-  scale_fill_gradient(low="white", high="red")
-
 full_data %>% 
-  ggplot() +
-  geom_sf(aes(fill = Time)) +
-  scale_fill_gradient(low="white", high="red")
-
-full_data %>% 
-  filter(Distance > 3.0) %>%
+  filter(Distance > 2.0) %>%
   ggplot() +
   geom_sf(aes(fill = Time/Distance)) +
   scale_fill_gradient(low="white", high="red") 
+
+full_data %>% 
+  filter(Distance > 2.0) %>%
+  ggplot() +
+  geom_sf(aes(fill = Arrival/Distance)) +
+  scale_fill_gradient(low="white", high="red")
 ```
 
 Assumption: All groups are affected equally by the pandemic and MARTA's reduction of services
@@ -104,20 +110,51 @@ full_data %>%
 
 ```{r}
 full_data %>%
-  filter(Distance > 5.0) %>%
+  filter(Distance > 2.0) %>%
+  ggplot(aes(x = black, y = Arrival)) +
+  geom_point() +
+  geom_smooth(method="lm", se = FALSE)
+
+full_data %>%
+  filter(Distance > 2.0) %>%
+  ggplot(aes(x = black, y = Time)) +
+  geom_point() +
+  geom_smooth(method="lm", se = FALSE)
+
+full_data %>%
+  filter(Distance > 2.0) %>%
   ggplot(aes(x = black, y = Time/Distance)) +
   geom_point() +
   geom_smooth(method="lm", se = FALSE)
 
 full_data %>%
-  filter(Distance > 7.0) %>%
-  ggplot(aes(x = black, y = Time/Distance)) +
+  filter(Distance > 2.0) %>%
+  ggplot(aes(x = black, y = Arrival/Distance)) +
   geom_point() +
   geom_smooth(method="lm", se = FALSE)
 
 full_data %>%
-  filter(Distance > 7.0) %>%
+  filter(Distance > 2.0) %>%
   ggplot(aes(x = Mean_Income, y = Time/Distance)) +
   geom_point() +
   geom_smooth(method="lm", se = FALSE)
+
+full_data %>%
+  filter(Distance > 2.0) %>%
+  ggplot(aes(x = Mean_Income, y = Arrival/Distance)) +
+  geom_point() +
+  geom_smooth(method="lm", se = FALSE)
 ```
+```{r}
+full_data %>%
+  ggplot(aes(x = black + hispanic, y = Mean_Income)) +
+  geom_point() +
+  geom_smooth(method="lm", se = FALSE)
+```
+
+Citations
+[1] https://www.youtube.com/watch?v=-ZDZtBRTyeI
+[2] https://www.atlantawealthbuilding.org/racial-wealth-gap
+[3] https://www.atlantamagazine.com/great-reads/marta-tsplost-transportation/
+[4] https://kinder.rice.edu/2017/02/08/new-study-examines-how-historic-racism-shaped-atlantas-transportation-network 
+[5]
