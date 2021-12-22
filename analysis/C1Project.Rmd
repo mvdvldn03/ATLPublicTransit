@@ -7,154 +7,245 @@ output: html_document
 ```{r}
 library(sf)
 library(tidyverse)
+library(viridis)
+options(scipen=999)
+th <- theme(
+  axis.text = element_text(size = 8, family = "Avenir Next"),
+  axis.title = element_text(size = 10, family = "Avenir Next"),  
+  plot.title = element_text(size = 13, family = "Avenir Next", hjust = 0.5, face = "bold"),
+  plot.caption = element_text(size = 6.5, family = "Avenir Next"),
+  legend.text = element_text(family = "Avenir Next"),
+  legend.title = element_text(size = 11, family = "Avenir Next")
+)
 ```
-
 
   There are many cities known for their traffic, fewer for their quality of public transportation. Compared to other global cities, Americans lag behind in both the coverage and frequency of public transit [1]. In my home city of Atlanta, traffic is a notorious problem, and many blame the over reliance on cars for their excessive commutes. 
   The main public operator in the city is MARTA, or the Metropolitan Atlanta Rapid Transit Authority, which operates a bus and a transit system. One historical issue with MARTA is racially-motivated coverage throughout the city. As one of the most racially income unequal cities in the country, many see Atlanta's underlying divides represented in its public transit or lack thereof [2]. Ever since its founding in 1965, the underfunded system has been seen as component of a two tiered system, designed to serve people of color and low income individuals -- highways and driving acting as the main method of commuting and general transportation for richer, white families in the suburbs. In fact, with the exception of Fulton and Dekalb, all counties in metropolitan Atlanta have hotly debated whether to allow MARTA expansion because of this ingrained belief. Especially in richer suburbs, namely Cobb, Clayton, and Gwinett, MARTA has had significant struggles trying to expand due to pushback from white residents who see the operator as one which will bring in low-income, people of color [3, 4].
-  However, is this stereotype of MARTA is actually true? Does MARTA provide more access and shorter commutes to lower-income and African-American and Hispanic communities? With such aggressive and continuous pushback lasting decades, has MARTA become a service than can only serve certain groups? 
-  Let's divide Atlanta into its Neighborhood Statistical Areas (NSA), each roughly a square mile:
+  However, is this stereotype of MARTA is actually true? Does MARTA provide more access and shorter commutes to people of color and lower-income communities? Has this aggressive and continuous pushback lasting decades been successful in limiting the options for richer, whiter suburbs?
   
+## Map of Atlanta's Neighborhood Statistical Areas
+  Let's divide Atlanta into its Neighborhood Statistical Areas (NSAs), each roughly a square mile:
+
 ```{r}
 setwd("~/Downloads/C1Project/analysis")
-shp = read_sf(dsn = "ATL_NSAs", layer = "City_of_Atlanta_Neighborhood_Statistical_Areas") %>%
+full_data = read_sf(dsn = "ATL_NSAs", layer = "City_of_Atlanta_Neighborhood_Statistical_Areas") %>%
   st_transform(crs=4326) %>%
   select(OBJECTID, STATISTICA, NEIGHBORHO, pop, white, black, asian, other, hispanic, geometry) %>%
   rename(ID = OBJECTID, GEOID = STATISTICA, neighborhoods = NEIGHBORHO)
 
-shp
-
-shp %>%
+full_data %>%
   ggplot() + 
-  geom_sf(fill = ifelse(shp$ID == 12, 'red', 'white')) + 
-  geom_sf_label(data=subset(shp, shp$ID == 12), aes(label = 'Downtown', family = "AvantGarde", fontface = "bold"), size = 3)
+  geom_sf(fill = ifelse(full_data$ID == 12, 'red', 'white')) + 
+  geom_sf_label(data=subset(full_data, full_data$ID == 12), aes(label = 'Downtown', family = "Avenir Next"), size = 2.5) +
+  labs(
+     title = "Map of Atlanta's Neighborhood Statistical Areas (NSAs)",
+     x = "Longitude", 
+     y = "Latitude", 
+     caption = "Sources: opendata.atlantaregional.com/datasets/d6298dee8938464294d3f49d473bcf15/"
+   ) + 
+  th
 ```
-  
 
-  https://opendata.atlantaregional.com/datasets/d6298dee8938464294d3f49d473bcf15/explore?showTable=true
-  https://fultoncountyopendata-fulcogis.opendata.arcgis.com/datasets/GARC::income-by-neighborhood-statistical-areas-2017/explore?showTable=true 
-  
-and their corresponding racial and income data. Then, I want to use Google Maps and its public transit feature to see how long commutes from each area are to get into downtown ATL and add the data on a corresponding tibble.
+We can also see their corresponding income and racial makeup.
 
 ```{r}
-setwd("~/Downloads/C1Project/analysis")
-shp = read_sf(dsn = "ATL_NSAs", layer = "City_of_Atlanta_Neighborhood_Statistical_Areas") %>%
-  st_transform(crs=4326) %>%
-  select(OBJECTID, STATISTICA, NEIGHBORHO, pop, white, black, asian, other, hispanic, geometry) %>%
-  rename(ID = OBJECTID, GEOID = STATISTICA, neighborhoods = NEIGHBORHO)
-
-times <- read_csv("times.csv")
-incomes <- read_csv("IncomeNSA.csv") %>%
+incomes <- read_csv("IncomeNSA.csv", show_col_types = FALSE) %>%
   select(GEOID, aMeanHHIncome_e) %>%
   rename(Mean_Income = aMeanHHIncome_e)
-distances <- read_csv("distance.csv")
-arrivals <- read_csv("arrivals.csv")
 
-full_data = shp %>%
-  left_join(y = times, by=c("ID"="ID")) %>%
-  left_join(y = distances, by=c("ID"="ID")) %>%
-  left_join(y = arrivals, by=c("ID"="ID")) %>%
-  left_join(y = incomes, by=c("GEOID"="GEOID"))  
+full_data = full_data %>%
+  left_join(y = incomes, by=c("GEOID"="GEOID"))
 
-full_data
+full_data %>%
+  ggplot() + 
+  geom_sf(aes(fill = black), color = NA) +
+  scale_fill_gradient(low="white", high="red", name = "African
+American
+Percentage") +
+  labs(
+     title = "Map of African American Presence in Atlanta's NSAs",
+     x = "Longitude", 
+     y = "Latitude", 
+     caption = "Sources: opendata.atlantaregional.com/datasets/d6298dee8938464294d3f49d473bcf15/"
+   ) + 
+  th
+
+full_data %>%
+  ggplot() + 
+  geom_sf(aes(fill = white ), color = NA) +
+  scale_fill_gradient(low="white", high="red", name = "White
+Percentage") + 
+  labs(
+     title = "Map of White Presence in Atlanta's NSAs",
+     x = "Longitude", 
+     y = "Latitude", 
+     caption = "Sources: opendata.atlantaregional.com/datasets/d6298dee8938464294d3f49d473bcf15/"
+   ) + 
+  th
+
+full_data %>%
+  ggplot() + 
+  geom_sf(aes(fill = Mean_Income), color = NA) +
+  scale_fill_gradient(low="white", high="red",name = "Mean
+Household
+Income") + 
+  labs(
+     title = "Mean Income in Atlanta's NSAs",
+     x = "Longitude", 
+     y = "Latitude", 
+     caption = "Sources: fultoncountyopendata-fulcogis.opendata.arcgis.com/datasets/GARC::
+                         income-by-neighborhood-statistical-areas-2017"
+   ) + 
+  th
 ```
+
+  Another important component to consider is how far away each NSA is from Downtown since communities of a certain  income or racial makeup may be farther away or closer to the city, meaning they would have a naturally longer travel time.
 
 ```{r}
-full_data %>% 
-  ggplot() +
-  geom_sf(aes(fill = black)) +
-  scale_fill_gradient(low="white", high="red")
+distances <- read_csv("distance.csv", show_col_types = FALSE)
 
-full_data %>% 
-  ggplot() +
-  geom_sf(aes(fill = black + hispanic )) +
-  scale_fill_gradient(low="white", high="red")
-
-full_data %>% 
-  ggplot() +
-  geom_sf(aes(fill = Mean_Income)) +
-  scale_fill_gradient(low="white", high="red")
-
-full_data %>% 
-  filter(Distance > 2.0) %>%
-  ggplot() +
-  geom_sf(aes(fill = Time/Distance)) +
-  scale_fill_gradient(low="white", high="red") 
-
-full_data %>% 
-  filter(Distance > 2.0) %>%
-  ggplot() +
-  geom_sf(aes(fill = Arrival/Distance)) +
-  scale_fill_gradient(low="white", high="red")
+full_data = full_data %>%
+  left_join(y = distances, by=c("ID"="ID"))
+```
+```{r}
+full_data %>%
+  ggplot() + 
+  geom_sf(aes(fill = Distance), color = NA) +
+  scale_fill_viridis(option = "magma", direction = -1) + 
+  labs(
+     title = "Map of Distances from Downtown for Atlanta's NSAs",
+     x = "Longitude", 
+     y = "Latitude", 
+     caption = "Source: Google Maps"
+   ) + 
+  th
 ```
 
+## Total Transportation Time
+Transit access is fundamentally a measure of how long one spends in their commute to get to a certain area. Since each individual has a slightly different commute, lets use Downtown Atlanta, filled in red in the first map, as a central location to base an average commute time on for each NSA. An "average" commute would also best be measured using an appropriate trip time when people are most likely to be leaving their neighborhood to get to work or generally into the city. Rush hour generally occurs around 8AM on weekdays, which gives a good, representative time frame to analyze each commute. Google Maps provides estimates for the total commute time from each NSA and its neighborhoods into downtown Atlanta. 
+```{r}
+times <- read_csv("times.csv", show_col_types = FALSE)
+full_data = full_data %>%
+  left_join(y = times, by=c("ID"="ID")) 
+```
+```{r}
+full_data %>%
+  ggplot() + 
+  geom_sf(aes(fill = Time), color = NA) +
+  scale_fill_viridis(option = "magma", direction = -1, name = "Total
+Commute
+Time") + 
+  labs(
+     title = "Map of Time to Downtown from Each NSA",
+     x = "Longitude", 
+     y = "Latitude", 
+     caption = "Source: Google Maps"
+   ) + 
+  th
+```
+  
+  A more representative measure of commute time is the distance of the NSA from downtown divided by this time data -- in general terms, the average speed, in miles per minute, one has during their commute considering an essentially straight path into downtown.
+  It is also to important to consider that the closer one gets to downtown, the less value public transit provides. Given the transfer and waiting time that accompanies any commute, walking becomes a better option for most of those living close to downtown, and Google Maps shows this by suggesting primarily walking routes when the transit option is selected for close-by NSAs. Filtering out all NSAs less than 1.5 miles away from downtown (roughly a 30 minute walk) results in the following map.
+  
+```{r}
+full_data %>%
+  filter(Distance > 1.5) %>%
+  ggplot() + 
+  geom_sf(aes(fill = Distance/Time), color = NA) +
+  scale_fill_viridis(option = "magma", direction = -1, name = "Average Commute Speed 
+   (miles/min)") + 
+  labs(
+     title = "Map of Commute Time to Downtown from Each NSA",
+     x = "Longitude", 
+     y = "Latitude", 
+     caption = "Source: Google Maps"
+   ) +
+  th
+```
+
+Plotting these data points to the racial and income makeup for each NSA remarkably shows little correlation between the factors.
+
+```{r}
+full_data %>%
+  ggplot(aes(x = black, y = Distance/Time)) +
+  geom_point() +
+  geom_smooth(method="lm") + 
+  labs(
+     x = "Percentage of African Americans (%)", 
+     y = "Average Commute Speed (miles/min)"
+   ) +
+  th
+
+full_data %>%
+  ggplot(aes(x = Mean_Income, y = Distance/Time)) +
+  geom_point() +
+  geom_smooth(method="lm") +
+  labs(
+     x = "Mean Household Income ($)", 
+     y = "Average Commute Speed (miles/min)"
+   ) +
+  th
+```
+
+## Arrival Time (Headway Time)
+Another way to measure transit access is via "a term "headway," or the amount of time in between arrivals of a certain mode of transportation -- in this case, how often MARTA's buses and trains run [5]. Directly gathering average headway for each NPU is difficult because the Google's suggested routes usually involve multiple transfers between bus and train and the specific lines taken are not always clear. An approximation for these average headways is the difference between the arrival time and start time (8AM), which give a better insight into the waiting time also necessary in one's commute. For example, an individual taking a 10-minute headway train into downtown will, at maximum, have to wait until 8:10 to begin his commute, whereas one relying on a 30-minute bus would have to wait until 8:30. The main issue with currently measuring headway is pandemic, which has forced MARTA to reduce its schedule for both its bus and train lines [6]. Given the difficult of gathering arrivals times so far in the past, the data collected should only be considered for current pandemic conditions.
+
+```{r}
+arrivals <- read_csv("arrivals.csv", show_col_types = FALSE)
+full_data = full_data %>%
+  left_join(y = arrivals, by=c("ID"="ID")) 
+```
+```{r}
+full_data %>% 
+  filter(Distance > 1.5) %>%
+  ggplot() +
+  geom_sf(aes(fill = Distance/Arrival), color = NA) +
+  scale_fill_viridis(option = "magma", direction = -1, name = "Average Total Speed 
+       (miles/min)") + 
+  labs(
+     title = "Map of Total Times to Downtown from Each NSA*",
+     x = "Longitude", 
+     y = "Latitude", 
+     caption = "(*) when leaving on a weekday at 8 AM
+     Source: Google Maps"
+  ) + 
+  th
+```
+
+Plotting arrival headway with racial and income makeup also shows little correlation between the factors.
+
+```{r}
+full_data %>%
+  ggplot(aes(x = black, y = Distance/Time)) +
+  geom_point() +
+  geom_smooth(method="lm") + 
+  labs(
+     x = "Percentage of African Americans (%)", 
+     y = "Average Commute Speed (miles/min)"
+   ) +
+  th
+
+full_data %>%
+  ggplot(aes(x = Mean_Income, y = Distance/Time)) +
+  geom_point() +
+  geom_smooth(method="lm") +
+  labs(
+     x = "Mean Household Income ($)", 
+     y = "Average Commute Speed (miles/min)"
+   ) +
+  th
+```
+
+## Summary
 Assumption: All groups are affected equally by the pandemic and MARTA's reduction of services
-Assumption: Same useage rates, access != useage
 
-```{r}
-full_data %>%
-  ggplot(aes(x = black, y = Time/Distance)) +
-  geom_point() +
-  geom_smooth(method="lm", se = FALSE)
+### Access != Useage
 
-full_data %>%
-  ggplot(aes(x = black + hispanic, y = Time/Distance)) +
-  geom_point() +
-  geom_smooth(method="lm", se = FALSE)
-
-full_data %>%
-  ggplot(aes(x = Mean_Income, y = Time/Distance)) +
-  geom_point() +
-  geom_smooth(method="lm", se = FALSE)
-```
-
-```{r}
-full_data %>%
-  filter(Distance > 2.0) %>%
-  ggplot(aes(x = black, y = Arrival)) +
-  geom_point() +
-  geom_smooth(method="lm", se = FALSE)
-
-full_data %>%
-  filter(Distance > 2.0) %>%
-  ggplot(aes(x = black, y = Time)) +
-  geom_point() +
-  geom_smooth(method="lm", se = FALSE)
-
-full_data %>%
-  filter(Distance > 2.0) %>%
-  ggplot(aes(x = black, y = Time/Distance)) +
-  geom_point() +
-  geom_smooth(method="lm", se = FALSE)
-
-full_data %>%
-  filter(Distance > 2.0) %>%
-  ggplot(aes(x = black, y = Arrival/Distance)) +
-  geom_point() +
-  geom_smooth(method="lm", se = FALSE)
-
-full_data %>%
-  filter(Distance > 2.0) %>%
-  ggplot(aes(x = Mean_Income, y = Time/Distance)) +
-  geom_point() +
-  geom_smooth(method="lm", se = FALSE)
-
-full_data %>%
-  filter(Distance > 2.0) %>%
-  ggplot(aes(x = Mean_Income, y = Arrival/Distance)) +
-  geom_point() +
-  geom_smooth(method="lm", se = FALSE)
-```
-```{r}
-full_data %>%
-  ggplot(aes(x = black + hispanic, y = Mean_Income)) +
-  geom_point() +
-  geom_smooth(method="lm", se = FALSE)
-```
 
 Citations
 [1] https://www.youtube.com/watch?v=-ZDZtBRTyeI
 [2] https://www.atlantawealthbuilding.org/racial-wealth-gap
 [3] https://www.atlantamagazine.com/great-reads/marta-tsplost-transportation/
 [4] https://kinder.rice.edu/2017/02/08/new-study-examines-how-historic-racism-shaped-atlantas-transportation-network 
-[5]
+[5] https://www.transitwiki.org/TransitWiki/index.php/Headway#:~:text=In%20transit%20speak%2C%20%22headway%22,have%2010%2D15%20minute%20headways
+[6] https://itsmarta.com/MARTA-service-modifications.aspx
