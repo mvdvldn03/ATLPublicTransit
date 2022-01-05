@@ -8,6 +8,8 @@ output: html_document
 library(sf)
 library(tidyverse)
 library(viridis)
+library(tidytransit)
+library(hms)
 options(scipen=999)
 th <- theme(
   axis.text = element_text(size = 8, family = "Avenir Next"),
@@ -24,7 +26,7 @@ th <- theme(
   However, is this stereotype of MARTA is actually true? Does MARTA provide more access and shorter commutes to people of color and lower-income communities? Has this aggressive and continuous pushback lasting decades been successful in limiting the options for richer, whiter suburbs?
   
 ## Map of Atlanta's Neighborhood Statistical Areas
-  Let's divide Atlanta into its Neighborhood Statistical Areas (NSAs), each roughly a square mile:
+  Atlanta's Neighborhood Statistical Areas (NSAs) are each roughly a square mile.
 
 ```{r}
 setwd("~/Downloads/C1Project/analysis")
@@ -36,7 +38,7 @@ full_data = read_sf(dsn = "ATL_NSAs", layer = "City_of_Atlanta_Neighborhood_Stat
 full_data %>%
   ggplot() + 
   geom_sf(fill = ifelse(full_data$ID == 12, 'red', 'white')) + 
-  geom_sf_label(data=subset(full_data, full_data$ID == 12), aes(label = 'Downtown', family = "Avenir Next"), size = 2.5) +
+  geom_sf_label(data=subset(full_data, full_data$ID == 12), aes(label = 'Downtown', family = "Avenir Next"), nudge_y = 0.027, size = 2.5) +
   labs(
      title = "Map of Atlanta's Neighborhood Statistical Areas (NSAs)",
      x = "Longitude", 
@@ -44,8 +46,6 @@ full_data %>%
      caption = "Sources: opendata.atlantaregional.com/datasets/d6298dee8938464294d3f49d473bcf15/"
    ) + 
   th
-
-full_data
 ```
 
 We can also see their corresponding income and racial makeup.
@@ -63,7 +63,7 @@ full_data %>%
   geom_sf(aes(fill = black), color = NA) +
   scale_fill_gradient(low="white", high="red", name = "African
 American
-Percentage") +
+Percentage (%)") +
   labs(
      title = "Map of African American Presence in Atlanta's NSAs",
      x = "Longitude", 
@@ -76,7 +76,7 @@ full_data %>%
   ggplot() + 
   geom_sf(aes(fill = white ), color = NA) +
   scale_fill_gradient(low="white", high="red", name = "White
-Percentage") + 
+Percentage (%)") + 
   labs(
      title = "Map of White Presence in Atlanta's NSAs",
      x = "Longitude", 
@@ -90,7 +90,7 @@ full_data %>%
   geom_sf(aes(fill = Mean_Income), color = NA) +
   scale_fill_gradient(low="white", high="red",name = "Mean
 Household
-Income") + 
+Income ($)") + 
   labs(
      title = "Mean Income in Atlanta's NSAs",
      x = "Longitude", 
@@ -101,7 +101,7 @@ Income") +
   th
 ```
 
-  Another important component to consider is how far away each NSA is from Downtown since communities of a certain  income or racial makeup may be farther away or closer to the city, meaning they would have a naturally longer travel time.
+  Another important component to consider is how far away each NSA is from Downtown since communities of a certain income or racial makeup may be farther away or closer to the city, meaning they would have a naturally longer travel time.
 
 ```{r}
 distances <- read_csv("distance.csv", show_col_types = FALSE)
@@ -123,8 +123,64 @@ full_data %>%
   th
 ```
 
+## Average Commute
+An "average" commute would also best be measured using an appropriate trip time when people are most likely to be leaving their neighborhood to get to work or generally into the city. Rush hour generally occurs around 8AM on weekdays, which gives a good, representative time frame to analyze each commute. We can visualize which bus and transit lines are active during this time frame using General Transit Feed Specification (GTFS) data. 
+
+```{r}
+marta <- read_gtfs("~/Downloads/gtfs.zip")
+marta <- gtfs_as_sf(marta)
+```
+
+```{r}
+morning_routes <- marta$stops %>% 
+    select(stop_id, stop_code, stop_name, geometry) %>%
+  inner_join(marta$stop_times %>% 
+    filter(departure_time < hms(0, 20, 8) & departure_time > hms(0, 0, 8)) %>%
+    select(trip_id, arrival_time, departure_time, stop_id), 
+  by = "stop_id") %>%
+  inner_join(marta$trip %>% 
+    filter(service_id == 3) %>%
+    select(route_id, service_id, trip_id, shape_id, direction_id),
+  by = "trip_id") %>%
+  st_join(marta$shapes)
+
+morning_routes %>%
+  filter(route_id >= 16076 & route_id <= 16079) %>%
+  ggplot + 
+  geom_sf(size = 0.05)
+
+morning_routes %>%
+  filter(route_id > 16079) %>%
+  ggplot + 
+  geom_sf(size = 0.005)
+```
+
+```{r}
+routes_sf <- get_route_geometry(marta)
+```
+
+```{r}
+downtown <- full_data %>% 
+  filter(ID == 12)
+group_colors <- c("blue", "gold", "green", "red")
+routes_sf
+
+routes_sf %>% 
+  filter(route_id >= 16076 & route_id <= 16079) %>%
+  ggplot() + 
+  geom_sf(aes(color = route_id)) + 
+  scale_color_manual(values = group_colors)
+
+routes_sf %>%
+  filter(st_intersects(geometry, downtown, sparse = FALSE)) %>%
+  filter(route_id > 16079) %>%
+  ggplot() + 
+  geom_sf(aes(color = route_id))
+```
+
 ## Total Transportation Time
-Transit access is fundamentally a measure of how long one spends in their commute to get to a certain area. Since each individual has a slightly different commute, lets use Downtown Atlanta, filled in red in the first map, as a central location to base an average commute time on for each NSA. An "average" commute would also best be measured using an appropriate trip time when people are most likely to be leaving their neighborhood to get to work or generally into the city. Rush hour generally occurs around 8AM on weekdays, which gives a good, representative time frame to analyze each commute. Google Maps provides estimates for the total commute time from each NSA and its neighborhoods into downtown Atlanta. 
+Transit access is fundamentally a measure of how long one spends in their commute to get to a certain area. Since each individual has a slightly different commute, lets use Downtown Atlanta, filled in red in the first map, as a central location to base an average commute time on for each NSA. Google Maps provides estimates for the total commute time from each NSA and its neighborhoods into downtown Atlanta.
+
 ```{r}
 times <- read_csv("times.csv", show_col_types = FALSE)
 full_data = full_data %>%
@@ -190,7 +246,7 @@ full_data %>%
 ```
 
 ## Arrival Time (Headway Time)
-Another way to measure transit access is via "a term "headway," or the amount of time in between arrivals of a certain mode of transportation -- in this case, how often MARTA's buses and trains run [5]. Directly gathering average headway for each NPU is difficult because the Google's suggested routes usually involve multiple transfers between bus and train and the specific lines taken are not always clear. An approximation for these average headways is the difference between the arrival time and start time (8AM), which give a better insight into the waiting time also necessary in one's commute. For example, an individual taking a 10-minute headway train into downtown will, at maximum, have to wait until 8:10 to begin his commute, whereas one relying on a 30-minute bus would have to wait until 8:30. The main issue with currently measuring headway is pandemic, which has forced MARTA to reduce its schedule for both its bus and train lines [6]. Given the difficult of gathering arrivals times so far in the past, the data collected should only be considered for current pandemic conditions.
+Another way to measure transit access is via "a term "headway," or the amount of time in between arrivals of a certain mode of transportation -- in this case, how often MARTA's buses and trains run [5]. Directly gathering average headway for each NPU is difficult because the Google's suggested routes usually involve multiple transfers between bus and train and the specific lines taken are not always clear. An approximation for these average headways is the difference between the arrival time and start time (8AM), which give a better insight into the waiting time also necessary in one's commute. For example, an individual taking a 10-minute headway train into downtown will, at maximum, have to wait until 8:10 to begin his commute, whereas one relying on a 30-minute bus would have to wait until 8:30. The main issue with currently measuring headway is pandemic, which has forced MARTA to reduce its schedules for both its bus and train lines [6]. Given the difficultly of gathering arrivals times so far in the past, the data collected should only be considered for current pandemic conditions.
 
 ```{r}
 arrivals <- read_csv("arrivals.csv", show_col_types = FALSE)
