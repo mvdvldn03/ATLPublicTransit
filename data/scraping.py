@@ -5,7 +5,7 @@ import random
 import time
 
 options = Options()
-#options.add_argument("--headless")
+options.add_argument("--headless")
 options.add_argument("--window-size=1920x1080")
 userAgent = "____"
 options.add_argument(f"user-agent={userAgent}")
@@ -108,10 +108,10 @@ def printDistance(list, reset_url):
 if __name__ == '__main__':
     neighborhoods = genAreas("City_of_Atlanta_Neighborhood_Statistical_Areas.csv")
 
-    reset_url = "https://www.google.com/maps/dir/Brookhaven,+GA/Downtown+Atlanta,+Atlanta,+GA/@33.8104311,-84.3980103,13z/data=!3m1!4b1!4m18!4m17!1m5!1m1!1s0x88f5089505f9f565:0x851a6587d0c37ec1!2m2!1d-84.3371266!2d33.8650186!1m5!1m1!1s0x88f5038740415b5d:0xa005d8181c4268d8!2m2!1d-84.3883717!2d33.755711!2m3!6e0!7e2!8j1639728000!3e3"
+    reset_url = "_______"
     driver.get(reset_url)
 
-    #distance = printDistance(neighborhoods, reset_url)
+    distance = printDistance(neighborhoods, reset_url)
     time = printTimes(neighborhoods, reset_url)
-    #print(distance)
+    print(distance)
     print(time)
