@@ -1,7 +1,7 @@
 ---
 title: "C1 Project (Atlanta Public Transit)"
 author: "Max Vandervelden"
-date: "12/13/2021"
+date: "1/5/2022"
 output: html_document
 ---
 ```{r}
@@ -12,8 +12,10 @@ library(tidytransit)
 library(hms)
 options(scipen=999)
 th <- theme(
-  axis.text = element_text(size = 8, family = "Avenir Next"),
   axis.title = element_text(size = 10, family = "Avenir Next"),  
+  axis.ticks = element_blank(),
+  axis.text.x = element_blank(), 
+  axis.text.y = element_blank(),
   plot.title = element_text(size = 13, family = "Avenir Next", hjust = 0.5, face = "bold"),
   plot.caption = element_text(size = 6.5, family = "Avenir Next"),
   legend.text = element_text(family = "Avenir Next"),
@@ -21,12 +23,12 @@ th <- theme(
 )
 ```
 
-  There are many cities known for their traffic, fewer for their quality of public transportation. Compared to other global cities, Americans lag behind in both the coverage and frequency of public transit [1]. In my home city of Atlanta, traffic is a notorious problem, and many blame the over reliance on cars for their excessive commutes. 
-  The main public operator in the city is MARTA, or the Metropolitan Atlanta Rapid Transit Authority, which operates a bus and a transit system. One historical issue with MARTA is racially-motivated coverage throughout the city. As one of the most racially income unequal cities in the country, many see Atlanta's underlying divides represented in its public transit or lack thereof [2]. Ever since its founding in 1965, the underfunded system has been seen as component of a two tiered system, designed to serve people of color and low income individuals -- highways and driving acting as the main method of commuting and general transportation for richer, white families in the suburbs. In fact, with the exception of Fulton and Dekalb, all counties in metropolitan Atlanta have hotly debated whether to allow MARTA expansion because of this ingrained belief. Especially in richer suburbs, namely Cobb, Clayton, and Gwinett, MARTA has had significant struggles trying to expand due to pushback from white residents who see the operator as one which will bring in low-income, people of color [3, 4].
-  However, is this stereotype of MARTA is actually true? Does MARTA provide more access and shorter commutes to people of color and lower-income communities? Has this aggressive and continuous pushback lasting decades been successful in limiting the options for richer, whiter suburbs?
+There are many cities known for their traffic, fewer for their quality of public transportation. Compared to other global cities, Americans lag behind in both the coverage and frequency of public transit [1]. In my home city of Atlanta, traffic is a notorious problem, and many blame the over reliance on cars for their excessive commutes.  
+The main public operator in the city is MARTA, or the Metropolitan Atlanta Rapid Transit Authority, which operates a bus and a transit system. One historical issue with MARTA is racially-motivated coverage throughout the city. As one of the most racially income unequal cities in the country, many see Atlanta's underlying divides represented in its public transit or lack thereof [2]. Ever since its founding in 1965, the underfunded system has been seen as component of a two tiered system, designed to serve people of color and low income individuals -- highways and driving acting as the main method of commuting and general transportation for richer, white families in the suburbs. In fact, with the exception of Fulton and Dekalb, all counties in metropolitan Atlanta have hotly debated whether to allow MARTA expansion because of this ingrained belief. Especially in richer suburbs, namely Cobb, Clayton, and Gwinett, MARTA has had significant struggles trying to expand due to pushback from white residents who see the operator as one which will bring in low-income, people of color [3, 4].  
+However, is this stereotype of MARTA is actually true? Does MARTA provide more access and shorter commutes to people of color and lower-income communities? Has this aggressive and continuous pushback lasting decades been successful in limiting the options for richer, whiter suburbs?
   
 ## Map of Atlanta's Neighborhood Statistical Areas
-  Atlanta's Neighborhood Statistical Areas (NSAs) are each roughly a square mile.
+Atlanta's Neighborhood Statistical Areas (NSAs) are each roughly a square mile.
 
 ```{r}
 setwd("~/Downloads/C1Project/analysis")
@@ -38,11 +40,9 @@ full_data = read_sf(dsn = "ATL_NSAs", layer = "City_of_Atlanta_Neighborhood_Stat
 full_data %>%
   ggplot() + 
   geom_sf(fill = ifelse(full_data$ID == 12, 'red', 'white')) + 
-  geom_sf_label(data=subset(full_data, full_data$ID == 12), aes(label = 'Downtown', family = "Avenir Next"), nudge_y = 0.027, size = 2.5) +
+  geom_sf_label(data=subset(full_data, full_data$ID == 12), aes(label = 'Downtown', family = "Avenir Next"), nudge_y = 0.027, size = 3) +
   labs(
      title = "Map of Atlanta's Neighborhood Statistical Areas (NSAs)",
-     x = "Longitude", 
-     y = "Latitude", 
      caption = "Sources: opendata.atlantaregional.com/datasets/d6298dee8938464294d3f49d473bcf15/"
    ) + 
   th
@@ -66,8 +66,6 @@ American
 Percentage (%)") +
   labs(
      title = "Map of African American Presence in Atlanta's NSAs",
-     x = "Longitude", 
-     y = "Latitude", 
      caption = "Sources: opendata.atlantaregional.com/datasets/d6298dee8938464294d3f49d473bcf15/"
    ) + 
   th
@@ -79,8 +77,6 @@ full_data %>%
 Percentage (%)") + 
   labs(
      title = "Map of White Presence in Atlanta's NSAs",
-     x = "Longitude", 
-     y = "Latitude", 
      caption = "Sources: opendata.atlantaregional.com/datasets/d6298dee8938464294d3f49d473bcf15/"
    ) + 
   th
@@ -93,15 +89,73 @@ Household
 Income ($)") + 
   labs(
      title = "Mean Income in Atlanta's NSAs",
-     x = "Longitude", 
-     y = "Latitude", 
      caption = "Sources: fultoncountyopendata-fulcogis.opendata.arcgis.com/datasets/GARC::
                          income-by-neighborhood-statistical-areas-2017"
    ) + 
   th
 ```
 
-  Another important component to consider is how far away each NSA is from Downtown since communities of a certain income or racial makeup may be farther away or closer to the city, meaning they would have a naturally longer travel time.
+We can visualize which bus and transit lines serve areas within Downtown Atlanta using General Transit Feed Specification (GTFS) data posted by MARTA. All four of MARTA's main lines (Red & Gold for Northbound/Southbound and Green & Blue for Eastbound/Westbound) stop at a central station, known as Five Points, which is located at the heart of Downtown Atlanta.
+
+```{r}
+marta <- read_gtfs("~/Downloads/gtfs.zip")
+marta <- gtfs_as_sf(marta)
+routes_sf <- get_route_geometry(marta)
+```
+```{r}
+stops <- marta$stops %>% 
+    select(stop_id, stop_code, stop_name, geometry) %>%
+  inner_join(marta$stop_times %>% 
+    filter(departure_time < hms(0, 20, 8) & departure_time > hms(0, 0, 8)) %>%
+    select(trip_id, arrival_time, departure_time, stop_id), 
+  by = "stop_id") %>%
+  inner_join(marta$trip %>% 
+    filter(route_id >= 16076 & route_id <= 16079) %>%
+    select(route_id, service_id, trip_id, shape_id, direction_id),
+  by = "trip_id")
+```
+```{r}
+downtown <- full_data %>% 
+  filter(ID == 12)
+
+transit <- routes_sf %>% 
+  filter(route_id >= 16076 & route_id <= 16079) %>%
+  st_intersection(full_data) 
+replace = c("Blue Line", "Gold Line", "Green Line", "Red Line")
+transit.lvl = c(16076, 16077, 16078, 16079)
+
+transit$route_id = replace[match(transit$route_id, transit.lvl)]
+
+bus <- routes_sf %>%
+  filter(st_intersects(geometry, downtown, sparse = FALSE) & route_id > 16079) %>%
+  st_intersection(full_data)
+
+group_colors <- c("blue", "gold", "green", "red")
+```
+```{r}
+ggplot() + 
+  geom_sf(data = full_data, fill = "white", color = "white") + 
+  geom_sf(data = transit, aes(color = route_id)) + 
+  scale_color_manual(values = group_colors, name = "Line") +
+  labs(
+     title = "MARTA Train Lines in Atlanta",
+     caption = "Sources: https://transitfeeds.com/p/marta/65"
+   ) + 
+  th
+
+ggplot() + 
+  geom_sf(data = full_data, fill = "white", color = "white") + 
+  geom_sf(data = bus, aes(color = route_id)) +
+  scale_fill_discrete(name = "Route ID") +
+  labs(
+     title = "MARTA Bus Lines in Atlanta",
+     caption = "Sources: https://transitfeeds.com/p/marta/65"
+   ) + 
+  th +
+  theme(legend.position = "none")
+```
+
+Another important component to consider is how far away each NSA is from Downtown since communities of a certain income or racial makeup may be farther away or closer to the city, meaning they would have a naturally longer travel time.
 
 ```{r}
 distances <- read_csv("distance.csv", show_col_types = FALSE)
@@ -116,70 +170,13 @@ full_data %>%
   scale_fill_viridis(option = "magma", direction = -1) + 
   labs(
      title = "Map of Distances from Downtown for Atlanta's NSAs",
-     x = "Longitude", 
-     y = "Latitude", 
      caption = "Source: Google Maps"
    ) + 
   th
 ```
 
-## Average Commute
-An "average" commute would also best be measured using an appropriate trip time when people are most likely to be leaving their neighborhood to get to work or generally into the city. Rush hour generally occurs around 8AM on weekdays, which gives a good, representative time frame to analyze each commute. We can visualize which bus and transit lines are active during this time frame using General Transit Feed Specification (GTFS) data. 
-
-```{r}
-marta <- read_gtfs("~/Downloads/gtfs.zip")
-marta <- gtfs_as_sf(marta)
-```
-
-```{r}
-morning_routes <- marta$stops %>% 
-    select(stop_id, stop_code, stop_name, geometry) %>%
-  inner_join(marta$stop_times %>% 
-    filter(departure_time < hms(0, 20, 8) & departure_time > hms(0, 0, 8)) %>%
-    select(trip_id, arrival_time, departure_time, stop_id), 
-  by = "stop_id") %>%
-  inner_join(marta$trip %>% 
-    filter(service_id == 3) %>%
-    select(route_id, service_id, trip_id, shape_id, direction_id),
-  by = "trip_id") %>%
-  st_join(marta$shapes)
-
-morning_routes %>%
-  filter(route_id >= 16076 & route_id <= 16079) %>%
-  ggplot + 
-  geom_sf(size = 0.05)
-
-morning_routes %>%
-  filter(route_id > 16079) %>%
-  ggplot + 
-  geom_sf(size = 0.005)
-```
-
-```{r}
-routes_sf <- get_route_geometry(marta)
-```
-
-```{r}
-downtown <- full_data %>% 
-  filter(ID == 12)
-group_colors <- c("blue", "gold", "green", "red")
-routes_sf
-
-routes_sf %>% 
-  filter(route_id >= 16076 & route_id <= 16079) %>%
-  ggplot() + 
-  geom_sf(aes(color = route_id)) + 
-  scale_color_manual(values = group_colors)
-
-routes_sf %>%
-  filter(st_intersects(geometry, downtown, sparse = FALSE)) %>%
-  filter(route_id > 16079) %>%
-  ggplot() + 
-  geom_sf(aes(color = route_id))
-```
-
 ## Total Transportation Time
-Transit access is fundamentally a measure of how long one spends in their commute to get to a certain area. Since each individual has a slightly different commute, lets use Downtown Atlanta, filled in red in the first map, as a central location to base an average commute time on for each NSA. Google Maps provides estimates for the total commute time from each NSA and its neighborhoods into downtown Atlanta.
+Transit access is fundamentally a measure of how long one spends in their commute to get to a certain area. Since each individual has a slightly different commute, lets use Downtown Atlanta, filled in red in the first map, as a central location to base an average commute time on for each NSA. An "average" commute would also best be measured using an appropriate trip time when people are most likely to be leaving their neighborhood to get to work or generally into the city. Rush hour generally occurs around 8AM on weekdays, which gives a good, representative time frame to analyze each commute. Google Maps provides estimates for the total commute time from each NSA and its neighborhoods into downtown Atlanta.
 
 ```{r}
 times <- read_csv("times.csv", show_col_types = FALSE)
@@ -195,15 +192,13 @@ Commute
 Time") + 
   labs(
      title = "Map of Time to Downtown from Each NSA",
-     x = "Longitude", 
-     y = "Latitude", 
      caption = "Source: Google Maps"
    ) + 
   th
 ```
   
-  A more representative measure of commute time is the distance of the NSA from downtown divided by this time data -- in general terms, the average speed, in miles per minute, one has during their commute considering an essentially straight path into downtown.
-  It is also to important to consider that the closer one gets to downtown, the less value public transit provides. Given the transfer and waiting time that accompanies any commute, walking becomes a better option for most of those living close to downtown, and Google Maps shows this by suggesting primarily walking routes when the transit option is selected for close-by NSAs. Filtering out all NSAs less than 1.5 miles away from downtown (roughly a 30 minute walk) results in the following map.
+A more representative measure of commute time is the distance of the NSA from downtown divided by this time data -- in general terms, the average speed, in miles per minute, one has during their commute considering an essentially straight path into downtown.  
+It is also to important to consider that the closer one gets to downtown, the less value public transit provides. Given the transfer and waiting time that accompanies any commute, walking becomes a better option for most of those living close to downtown, and Google Maps shows this by suggesting primarily walking routes when the transit option is selected for close-by NSAs. Filtering out all NSAs less than 1.5 miles away from downtown (roughly a 30 minute walk) results in the following map.
   
 ```{r}
 full_data %>%
@@ -214,8 +209,6 @@ full_data %>%
    (miles/min)") + 
   labs(
      title = "Map of Commute Time to Downtown from Each NSA",
-     x = "Longitude", 
-     y = "Latitude", 
      caption = "Source: Google Maps"
    ) +
   th
@@ -246,7 +239,7 @@ full_data %>%
 ```
 
 ## Arrival Time (Headway Time)
-Another way to measure transit access is via "a term "headway," or the amount of time in between arrivals of a certain mode of transportation -- in this case, how often MARTA's buses and trains run [5]. Directly gathering average headway for each NPU is difficult because the Google's suggested routes usually involve multiple transfers between bus and train and the specific lines taken are not always clear. An approximation for these average headways is the difference between the arrival time and start time (8AM), which give a better insight into the waiting time also necessary in one's commute. For example, an individual taking a 10-minute headway train into downtown will, at maximum, have to wait until 8:10 to begin his commute, whereas one relying on a 30-minute bus would have to wait until 8:30. The main issue with currently measuring headway is pandemic, which has forced MARTA to reduce its schedules for both its bus and train lines [6]. Given the difficultly of gathering arrivals times so far in the past, the data collected should only be considered for current pandemic conditions.
+Another way to measure transit access is via "headway," or the amount of time in between arrivals of a certain mode of transportation -- in this case, how often MARTA's buses and trains run [5]. Directly gathering average headway for each NPU is difficult because the Google's suggested routes usually involve multiple transfers between bus and train and the specific lines taken are not always clear. An approximation for these average headways is the difference between the arrival time and start time (8AM), which give a better insight into the waiting time also necessary in one's commute. For example, an individual taking a 10-minute headway train into downtown will, at maximum, have to wait until 8:10 to begin his commute, whereas one relying on a 30-minute bus would have to wait until 8:30. The main issue with currently measuring headway is pandemic, which has forced MARTA to reduce its schedules for both its bus and train lines [6]. Given the difficultly of gathering arrivals times so far in the past, the data collected should only be considered for current pandemic conditions.
 
 ```{r}
 arrivals <- read_csv("arrivals.csv", show_col_types = FALSE)
@@ -262,8 +255,6 @@ full_data %>%
        (miles/min)") + 
   labs(
      title = "Map of Total Times to Downtown from Each NSA*",
-     x = "Longitude", 
-     y = "Latitude", 
      caption = "(*) when leaving on a weekday at 8 AM
      Source: Google Maps"
   ) + 
@@ -295,15 +286,13 @@ full_data %>%
 ```
 
 ## Summary
-Assumption: All groups are affected equally by the pandemic and MARTA's reduction of services
+In current pandemic conditions, its difficult to judge the access MARTA normally provides Atlantans. However, under these schedules, MARTA provides relatively equal access to Atlanta's Neighborhood Statistical Areas (NSAs) in relation to income and racial composition. When measuring access via total transportation time, there was little correlation between the factors, even when adjusting for each NSAs distance from Downtown. Measuring access using arrival times, a better representation of differences in headway between bus and train lines, also showed little correlation. There are likely a few reasons for this, but one of the main ones is MARTA's Northbound Gold and Red Lines, which cover much of northern Atlanta's whiter and richer suburbs like Brookhaven, Buckhead, and Lenox.  
+More analysis could be conducted in the counties outside of Atlanta mentioned earlier, like Cobb and Gwinett, which blocked MARTA's expansion, but it is difficult to gather data on the scale of an NSA without a similar metric for the whole of Georgia.
 
-### Access != Useage
-
-
-Citations
-[1] https://www.youtube.com/watch?v=-ZDZtBRTyeI
-[2] https://www.atlantawealthbuilding.org/racial-wealth-gap
-[3] https://www.atlantamagazine.com/great-reads/marta-tsplost-transportation/
-[4] https://kinder.rice.edu/2017/02/08/new-study-examines-how-historic-racism-shaped-atlantas-transportation-network 
-[5] https://www.transitwiki.org/TransitWiki/index.php/Headway#:~:text=In%20transit%20speak%2C%20%22headway%22,have%2010%2D15%20minute%20headways
-[6] https://itsmarta.com/MARTA-service-modifications.aspx
+Citations  
+[1] https://www.youtube.com/watch?v=-ZDZtBRTyeI  
+[2] https://www.atlantawealthbuilding.org/racial-wealth-gap   
+[3] https://www.atlantamagazine.com/great-reads/marta-tsplost-transportation/   
+[4] https://kinder.rice.edu/2017/02/08/new-study-examines-how-historic-racism-shaped-atlantas-transportation-network   
+[5] https://www.transitwiki.org/TransitWiki/index.php/Headway  
+[6] https://itsmarta.com/MARTA-service-modifications.aspx  
