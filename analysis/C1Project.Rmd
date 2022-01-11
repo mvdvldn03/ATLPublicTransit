@@ -4,7 +4,15 @@ author: "Max Vandervelden"
 date: "1/5/2022"
 output: html_document
 ---
-```{r}
+
+<style type="text/css">
+body {
+  font-size: 11pt;
+  font-family: verdana
+}
+</style>
+
+```{r message=FALSE, warning=FALSE}
 library(sf)
 library(tidyverse)
 library(viridis)
@@ -30,7 +38,7 @@ However, is this stereotype of MARTA is actually true? Does MARTA provide more a
 ## Map of Atlanta's Neighborhood Statistical Areas
 Atlanta's Neighborhood Statistical Areas (NSAs) are each roughly a square mile.
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 setwd("~/Downloads/C1Project/analysis")
 full_data = read_sf(dsn = "ATL_NSAs", layer = "City_of_Atlanta_Neighborhood_Statistical_Areas") %>%
   st_transform(crs=4326) %>%
@@ -50,7 +58,7 @@ full_data %>%
 
 We can also see their corresponding income and racial makeup.
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 incomes <- read_csv("IncomeNSA.csv", show_col_types = FALSE) %>%
   select(GEOID, aMeanHHIncome_e) %>%
   rename(Mean_Income = aMeanHHIncome_e)
@@ -97,12 +105,12 @@ Income ($)") +
 
 We can visualize which bus and transit lines serve areas within Downtown Atlanta using General Transit Feed Specification (GTFS) data posted by MARTA. All four of MARTA's main lines (Red & Gold for Northbound/Southbound and Green & Blue for Eastbound/Westbound) stop at a central station, known as Five Points, which is located at the heart of Downtown Atlanta.
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 marta <- read_gtfs("~/Downloads/gtfs.zip")
 marta <- gtfs_as_sf(marta)
 routes_sf <- get_route_geometry(marta)
 ```
-```{r}
+```{r message=FALSE, warning=FALSE}
 stops <- marta$stops %>% 
     select(stop_id, stop_code, stop_name, geometry) %>%
   inner_join(marta$stop_times %>% 
@@ -114,7 +122,7 @@ stops <- marta$stops %>%
     select(route_id, service_id, trip_id, shape_id, direction_id),
   by = "trip_id")
 ```
-```{r}
+```{r message=FALSE, warning=FALSE}
 downtown <- full_data %>% 
   filter(ID == 12)
 
@@ -132,7 +140,7 @@ bus <- routes_sf %>%
 
 group_colors <- c("blue", "gold", "green", "red")
 ```
-```{r}
+```{r message=FALSE, warning=FALSE}
 ggplot() + 
   geom_sf(data = full_data, fill = "white", color = "white") + 
   geom_sf(data = transit, aes(color = route_id)) + 
@@ -157,13 +165,13 @@ ggplot() +
 
 Another important component to consider is how far away each NSA is from Downtown since communities of a certain income or racial makeup may be farther away or closer to the city, meaning they would have a naturally longer travel time.
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 distances <- read_csv("distance.csv", show_col_types = FALSE)
 
 full_data = full_data %>%
   left_join(y = distances, by=c("ID"="ID"))
 ```
-```{r}
+```{r message=FALSE, warning=FALSE}
 full_data %>%
   ggplot() + 
   geom_sf(aes(fill = Distance), color = NA) +
@@ -178,12 +186,12 @@ full_data %>%
 ## Total Transportation Time
 Transit access is fundamentally a measure of how long one spends in their commute to get to a certain area. Since each individual has a slightly different commute, lets use Downtown Atlanta, filled in red in the first map, as a central location to base an average commute time on for each NSA. An "average" commute would also best be measured using an appropriate trip time when people are most likely to be leaving their neighborhood to get to work or generally into the city. Rush hour generally occurs around 8AM on weekdays, which gives a good, representative time frame to analyze each commute. Google Maps provides estimates for the total commute time from each NSA and its neighborhoods into downtown Atlanta.
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 times <- read_csv("times.csv", show_col_types = FALSE)
 full_data = full_data %>%
   left_join(y = times, by=c("ID"="ID")) 
 ```
-```{r}
+```{r message=FALSE, warning=FALSE}
 full_data %>%
   ggplot() + 
   geom_sf(aes(fill = Time), color = NA) +
@@ -200,7 +208,7 @@ Time") +
 A more representative measure of commute time is the distance of the NSA from downtown divided by this time data -- in general terms, the average speed, in miles per minute, one has during their commute considering an essentially straight path into downtown.  
 It is also to important to consider that the closer one gets to downtown, the less value public transit provides. Given the transfer and waiting time that accompanies any commute, walking becomes a better option for most of those living close to downtown, and Google Maps shows this by suggesting primarily walking routes when the transit option is selected for close-by NSAs. Filtering out all NSAs less than 1.5 miles away from downtown (roughly a 30 minute walk) results in the following map.
   
-```{r}
+```{r message=FALSE, warning=FALSE}
 full_data %>%
   filter(Distance > 1.5) %>%
   ggplot() + 
@@ -216,7 +224,7 @@ full_data %>%
 
 Plotting these data points to the racial and income makeup for each NSA remarkably shows little correlation between the factors.
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 full_data %>%
   ggplot(aes(x = black, y = Distance/Time)) +
   geom_point() +
@@ -241,12 +249,12 @@ full_data %>%
 ## Arrival Time (Headway Time)
 Another way to measure transit access is via "headway," or the amount of time in between arrivals of a certain mode of transportation -- in this case, how often MARTA's buses and trains run [5]. Directly gathering average headway for each NPU is difficult because the Google's suggested routes usually involve multiple transfers between bus and train and the specific lines taken are not always clear. An approximation for these average headways is the difference between the arrival time and start time (8AM), which give a better insight into the waiting time also necessary in one's commute. For example, an individual taking a 10-minute headway train into downtown will, at maximum, have to wait until 8:10 to begin his commute, whereas one relying on a 30-minute bus would have to wait until 8:30. The main issue with currently measuring headway is pandemic, which has forced MARTA to reduce its schedules for both its bus and train lines [6]. Given the difficultly of gathering arrivals times so far in the past, the data collected should only be considered for current pandemic conditions.
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 arrivals <- read_csv("arrivals.csv", show_col_types = FALSE)
 full_data = full_data %>%
   left_join(y = arrivals, by=c("ID"="ID")) 
 ```
-```{r}
+```{r message=FALSE, warning=FALSE}
 full_data %>% 
   filter(Distance > 1.5) %>%
   ggplot() +
@@ -263,7 +271,7 @@ full_data %>%
 
 Plotting arrival headway with racial and income makeup also shows little correlation between the factors.
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 full_data %>%
   ggplot(aes(x = black, y = Distance/Time)) +
   geom_point() +
