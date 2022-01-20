@@ -18,16 +18,30 @@ library(tidyverse)
 library(viridis)
 library(tidytransit)
 library(hms)
+library(ggpubr)
+
 options(scipen=999)
+
 th <- theme(
   axis.title = element_text(size = 10, family = "Avenir Next"),  
   axis.ticks = element_blank(),
   axis.text.x = element_blank(), 
   axis.text.y = element_blank(),
   plot.title = element_text(size = 13, family = "Avenir Next", hjust = 0.5, face = "bold"),
-  plot.caption = element_text(size = 6.5, family = "Avenir Next"),
+  plot.caption = element_text(size = 10, family = "Avenir Next"),
   legend.text = element_text(family = "Avenir Next"),
   legend.title = element_text(size = 11, family = "Avenir Next")
+)
+
+th_sub <- theme(
+  axis.title = element_text(size = 12, family = "Avenir Next"),  
+  axis.ticks = element_blank(),
+  axis.text.x = element_blank(), 
+  axis.text.y = element_blank(),
+  plot.title = element_text(size = 15, family = "Avenir Next", hjust = 0.5, face = "bold"),
+  plot.caption = element_text(family = "Avenir Next"),
+  legend.text = element_text(size = 10, family = "Avenir Next"),
+  legend.title = element_text(size = 10, family = "Avenir Next")
 )
 ```
 
@@ -51,7 +65,7 @@ full_data %>%
   geom_sf_label(data=subset(full_data, full_data$ID == 12), aes(label = 'Downtown', family = "Avenir Next"), nudge_y = 0.027, size = 3) +
   labs(
      title = "Map of Atlanta's Neighborhood Statistical Areas (NSAs)",
-     caption = "Sources: opendata.atlantaregional.com/datasets/d6298dee8938464294d3f49d473bcf15/"
+     caption = "Sources: [7]"
    ) + 
   th
 ```
@@ -65,42 +79,41 @@ incomes <- read_csv("IncomeNSA.csv", show_col_types = FALSE) %>%
 
 full_data = full_data %>%
   left_join(y = incomes, by=c("GEOID"="GEOID"))
-
-full_data %>%
+```
+```{r message=FALSE, warning=FALSE, fig.height = 5, fig.width = 14}
+black <- full_data %>%
   ggplot() + 
   geom_sf(aes(fill = black), color = NA) +
-  scale_fill_gradient(low="white", high="red", name = "African
-American
-Percentage (%)") +
+  scale_fill_gradient(low="white", high="red") +
   labs(
-     title = "Map of African American Presence in Atlanta's NSAs",
-     caption = "Sources: opendata.atlantaregional.com/datasets/d6298dee8938464294d3f49d473bcf15/"
+     title = "Black Percentage"
    ) + 
-  th
+  th_sub +
+  guides(fill = guide_legend(title=""))
 
-full_data %>%
+white <- full_data %>%
   ggplot() + 
   geom_sf(aes(fill = white ), color = NA) +
-  scale_fill_gradient(low="white", high="red", name = "White
-Percentage (%)") + 
+  scale_fill_gradient(low="white", high="red") + 
   labs(
-     title = "Map of White Presence in Atlanta's NSAs",
-     caption = "Sources: opendata.atlantaregional.com/datasets/d6298dee8938464294d3f49d473bcf15/"
+     title = "White Percentage"
    ) + 
-  th
+  th_sub +
+  guides(fill = guide_legend(title=""))
 
-full_data %>%
+income <- full_data %>%
   ggplot() + 
   geom_sf(aes(fill = Mean_Income), color = NA) +
-  scale_fill_gradient(low="white", high="red",name = "Mean
-Household
-Income ($)") + 
+  scale_fill_gradient(low="white", high="red") + 
   labs(
-     title = "Mean Income in Atlanta's NSAs",
-     caption = "Sources: fultoncountyopendata-fulcogis.opendata.arcgis.com/datasets/GARC::
-                         income-by-neighborhood-statistical-areas-2017"
+     title = "Mean Income",
+     legend.title = ""
    ) + 
-  th
+  th_sub +
+  guides(fill = guide_legend(title=""))
+
+fig = ggarrange(black, white, income, nrow = 1, widths = c(1,1,1.065))
+annotate_figure(fig, top = text_grob("Makeup of Atlanta's NSAs", family = "Avenir Next", face = "bold", hjust = 0.65, size = 20), bottom = text_grob("Sources: [7,8]", hjust = -4.75, family = "Avenir Next", size = 12))
 ```
 
 We can visualize which bus and transit lines serve areas within Downtown Atlanta using General Transit Feed Specification (GTFS) data posted by MARTA. All four of MARTA's main lines (Red & Gold for Northbound/Southbound and Green & Blue for Eastbound/Westbound) stop at a central station, known as Five Points, which is located at the heart of Downtown Atlanta.
@@ -140,27 +153,24 @@ bus <- routes_sf %>%
 
 group_colors <- c("blue", "gold", "green", "red")
 ```
-```{r message=FALSE, warning=FALSE}
-ggplot() + 
+```{r message=FALSE, warning=FALSE, fig.height = 5, fig.width = 9}
+trains <- ggplot() + 
   geom_sf(data = full_data, fill = "white", color = "white") + 
   geom_sf(data = transit, aes(color = route_id)) + 
   scale_color_manual(values = group_colors, name = "Line") +
-  labs(
-     title = "MARTA Train Lines in Atlanta",
-     caption = "Sources: https://transitfeeds.com/p/marta/65"
-   ) + 
-  th
+  labs(title = "Train Lines") + 
+  th_sub
 
-ggplot() + 
+buses <- ggplot() + 
   geom_sf(data = full_data, fill = "white", color = "white") + 
   geom_sf(data = bus, aes(color = route_id)) +
   scale_fill_discrete(name = "Route ID") +
-  labs(
-     title = "MARTA Bus Lines in Atlanta",
-     caption = "Sources: https://transitfeeds.com/p/marta/65"
-   ) + 
-  th +
-  theme(legend.position = "none")
+  labs(title = "Bus Lines") +
+  th_sub +
+  theme(legend.position = "position")
+
+fig = ggarrange(buses, trains, nrow = 1, ncol = 2, widths = c(0.75, 1))
+annotate_figure(fig, top = text_grob("MARTA's Bus and Train Lines in ATL", hjust = 0.625, family = "Avenir Next", face = "bold", size = 15), bottom = text_grob("Source: [9]", hjust = -3.5, family = "Avenir Next", size = 10))
 ```
 
 Another important component to consider is how far away each NSA is from Downtown since communities of a certain income or racial makeup may be farther away or closer to the city, meaning they would have a naturally longer travel time.
@@ -224,8 +234,8 @@ full_data %>%
 
 Plotting these data points to the racial and income makeup for each NSA remarkably shows little correlation between the factors.
 
-```{r message=FALSE, warning=FALSE}
-full_data %>%
+```{r message=FALSE, warning=FALSE, fig.height = 5, fig.width = 12.5}
+black_time <- full_data %>%
   ggplot(aes(x = black, y = Distance/Time)) +
   geom_point() +
   geom_smooth(method="lm") + 
@@ -233,17 +243,20 @@ full_data %>%
      x = "Percentage of African Americans (%)", 
      y = "Average Commute Speed (miles/min)"
    ) +
-  th
+  th_sub
 
-full_data %>%
+income_time <- full_data %>%
   ggplot(aes(x = Mean_Income, y = Distance/Time)) +
   geom_point() +
   geom_smooth(method="lm") +
   labs(
-     x = "Mean Household Income ($)", 
-     y = "Average Commute Speed (miles/min)"
+     x = "Mean Household Income ($)",
+     y = ""
    ) +
-  th
+  th_sub
+
+fig = ggarrange(black_time, income_time, nrow = 1)
+annotate_figure(fig, bottom = text_grob("Source: Google Maps", family = "Avenir Next", hjust = -3.5, size = 10))
 ```
 
 ## Arrival Time (Headway Time)
@@ -271,26 +284,29 @@ full_data %>%
 
 Plotting arrival headway with racial and income makeup also shows little correlation between the factors.
 
-```{r message=FALSE, warning=FALSE}
-full_data %>%
-  ggplot(aes(x = black, y = Distance/Time)) +
+```{r message=FALSE, warning=FALSE, fig.height = 5, fig.width = 12.5}
+black_arrival <- full_data %>%
+  ggplot(aes(x = black, y = Distance/Arrival)) +
   geom_point() +
   geom_smooth(method="lm") + 
   labs(
      x = "Percentage of African Americans (%)", 
      y = "Average Commute Speed (miles/min)"
    ) +
-  th
+  th_sub
 
-full_data %>%
-  ggplot(aes(x = Mean_Income, y = Distance/Time)) +
+income_arrival <- full_data %>%
+  ggplot(aes(x = Mean_Income, y = Distance/Arrival)) +
   geom_point() +
   geom_smooth(method="lm") +
   labs(
      x = "Mean Household Income ($)", 
-     y = "Average Commute Speed (miles/min)"
+     y = ""
    ) +
-  th
+  th_sub
+
+fig = ggarrange(black_arrival, income_arrival, nrow = 1)
+annotate_figure(fig, bottom = text_grob("Source: Google Maps", family = "Avenir Next", hjust = -3.5, size = 10))
 ```
 
 ## Summary
@@ -304,3 +320,6 @@ Citations
 [4] https://kinder.rice.edu/2017/02/08/new-study-examines-how-historic-racism-shaped-atlantas-transportation-network   
 [5] https://www.transitwiki.org/TransitWiki/index.php/Headway  
 [6] https://itsmarta.com/MARTA-service-modifications.aspx  
+[7] https://opendata.atlantaregional.com/datasets/d6298dee8938464294d3f49d473bcf15
+[8] https://fultoncountyopendata-fulcogis.opendata.arcgis.com/datasets/GARC::income-by-neighborhood-statistical-areas-2017
+[9] https://transitfeeds.com/p/marta/65
