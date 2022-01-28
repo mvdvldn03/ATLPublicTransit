@@ -65,7 +65,7 @@ full_data %>%
   geom_sf_label(data=subset(full_data, full_data$ID == 12), aes(label = 'Downtown', family = "Avenir Next"), nudge_y = 0.027, size = 3) +
   labs(
      title = "Map of Atlanta's Neighborhood Statistical Areas (NSAs)",
-     caption = "Sources: [7]"
+     caption = "Source: [7]"
    ) + 
   th
 ```
